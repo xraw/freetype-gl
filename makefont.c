@@ -49,6 +49,8 @@
     #include <GL/glut.h>
 #endif
 
+#define DEFAULT_TEX_SIZE (128)
+
 // ---------------------------------------------------------------- display ---
 void display( void )
 {}
@@ -65,7 +67,7 @@ void keyboard( unsigned char key, int x, int y )
 void print_help()
 {
     fprintf( stderr, "Usage: makefont [--help] --font <font file> "
-             "--header <header file> --size <font size> --variable <variable name>\n" );
+             "--header <header file> --size <font size> --variable <variable name> [optional: --tex_size <texture size>]\n" );
 }
 
 // ------------------------------------------------------------------- main ---
@@ -75,12 +77,13 @@ int main( int argc, char **argv )
     size_t i, j;
     int arg;
 
-    wchar_t * font_cache = 
+    wchar_t * font_cache =
         L" !\"#$%&'()*+,-./0123456789:;<=>?"
         L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
         L"`abcdefghijklmnopqrstuvwxyz{|}~";
 
     float  font_size   = 0.0;
+    int    tex_size    = 0;
     const char * font_filename   = NULL;
     const char * header_filename = NULL;
     const char * variable_name   = "font";
@@ -192,6 +195,30 @@ int main( int argc, char **argv )
             continue;
         }
 
+        if ( 0 == strcmp( "--texsize", argv[arg] ) || 0 == strcmp( "-ts", argv[arg] ) )
+        {
+            ++arg;
+
+            if ( 0 != tex_size )
+            {
+                fprintf( stderr, "Multiple --size parameters.\n" );
+                print_help();
+                exit( 1 );
+            }
+
+            if ( arg >= argc )
+            {
+                fprintf( stderr, "No texture size given, using default %dx%d.\n", DEFAULT_TEX_SIZE, DEFAULT_TEX_SIZE );
+                tex_size = DEFAULT_TEX_SIZE;
+                errno = 0;
+            } else {
+                errno = 0;
+                tex_size = atoi( argv[arg] );
+            }
+
+            continue;
+        }
+
         fprintf( stderr, "Unknown parameter %s\n", argv[arg] );
         print_help();
         exit( 1 );
@@ -231,7 +258,12 @@ int main( int argc, char **argv )
         exit( 1 );
     }
 
-    texture_atlas_t * atlas = texture_atlas_new( 128, 128, 1 );
+    if (tex_size <= 0) {
+        tex_size = DEFAULT_TEX_SIZE;
+        fprintf( stderr, "No texture size given, using default %dx%d.\n", DEFAULT_TEX_SIZE, DEFAULT_TEX_SIZE );
+    }
+    
+    texture_atlas_t * atlas = texture_atlas_new( tex_size, tex_size, 1 );
     texture_font_t  * font  = texture_font_new_from_file( atlas, font_size, font_filename );
 
     glutInit( &argc, argv );
@@ -250,7 +282,7 @@ int main( int argc, char **argv )
     wprintf( L"Number of missed glyphs    : %ld\n", missed );
     wprintf( L"Texture size               : %ldx%ldx%ld\n",
              atlas->width, atlas->height, atlas->depth );
-    wprintf( L"Texture occupancy          : %.2f%%\n", 
+    wprintf( L"Texture occupancy          : %.2f%%\n",
             100.0*atlas->used/(float)(atlas->width*atlas->height) );
     wprintf( L"\n" );
     wprintf( L"Header filename            : %s\n", header_filename );
@@ -277,7 +309,7 @@ int main( int argc, char **argv )
     // -------------
     // Header
     // -------------
-    fwprintf( file, 
+    fwprintf( file,
         L"/* ============================================================================\n"
         L" * Freetype GL - A C OpenGL Freetype engine\n"
         L" * Platform:    Any\n"
@@ -357,7 +389,7 @@ int main( int argc, char **argv )
         L"} texture_font_t;\n\n", texture_size, glyph_count );
 
 
-    
+
     fwprintf( file, L"texture_font_t %s = {\n", variable_name );
 
 
@@ -390,7 +422,7 @@ int main( int argc, char **argv )
     // -------------------
     // Texture information
     // -------------------
-    fwprintf( file, L" %ff, %ff, %ff, %ff, %ff, %d, \n", 
+    fwprintf( file, L" %ff, %ff, %ff, %ff, %ff, %d, \n",
              font->size, font->height,
              font->linegap,font->ascender, font->descender,
              glyph_count );
@@ -413,7 +445,7 @@ int main( int argc, char **argv )
                  glyph->offset_x, glyph->offset_y );
         wprintf( L"  advance    : %ff, %ff\n",
                  glyph->advance_x, glyph->advance_y );
-        wprintf( L"  tex coords.: %ff, %ff, %ff, %ff\n", 
+        wprintf( L"  tex coords.: %ff, %ff, %ff, %ff\n",
                  glyph->u0, glyph->v0, glyph->u1, glyph->v1 );
 
         wprintf( L"  kerning    : " );
@@ -421,7 +453,7 @@ int main( int argc, char **argv )
         {
             for( j=0; j < glyph->kerning_count; ++j )
             {
-                wprintf( L"('%lc', %ff)", 
+                wprintf( L"('%lc', %ff)",
                          glyph->kerning[j].charcode, glyph->kerning[j].kerning );
                 if( j < (glyph->kerning_count-1) )
                 {
